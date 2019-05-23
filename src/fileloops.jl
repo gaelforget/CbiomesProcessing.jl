@@ -187,8 +187,9 @@ function loop_task3(indx)
    filOut=task["OutputFile"]
    !isdir(dirOut) ? mkdir(dirOut) : nothing
 
-   siz=Tuple(task["OutputSize"])
+   siz=Tuple(task["InputSize"])
    prec=Float32
+   recl=prod(siz)*4
 
    tmp1=readdir(dirIn*filIn)
    tmp1=filter(x -> occursin(filIn,x),tmp1)
@@ -206,30 +207,29 @@ function loop_task3(indx)
    for ff=1:nf
       #1) read biomass
       fil=dirIn*filIn*"/"*filList[ff]
-      tmp=Array{Float32,3}(undef,(720,360,50))
+      tmp=Array{Float32,3}(undef,siz)
       fid = open(fil)
       read!(fid,tmp)
       tmp = hton.(tmp)
       close(fid)
 
       #2) compute export rate
-      PhytoExp=similar(tmp);
-      for kk=1:49
+      xprt=similar(tmp);
+      for kk=1:siz[3]-1
          tmp0=Wsink*max.(tmp[:,:,kk],0.0)
          tmp1=Wsink*max.(tmp[:,:,kk],0.0)
          tmp2=isfinite.(tmp[:,:,kk+1])
          tmp1[.!tmp2].=NaN
-         PhytoExp[:,:,kk]=tmp1
+         xprt[:,:,kk]=tmp1
       end
-      PhytoExp[:,:,50].=NaN
+      xprt[:,:,siz[3]].=NaN
 
       #println(fil)
-      recl=720*360*50*4
-      filOut=dirOut*"PhytoExp/"
+      filOut=dirOut*task["OutputFile"]*"/"
       !isdir(filOut) ? mkdir(filOut) : nothing
       filOut=filOut*replace(filList[ff],task["InputFile"][1] => task["OutputFile"])
       f =  FortranFile(filOut,"w",access="direct",recl=recl,convert="big-endian")
-      write(f,rec=1,Float32.(PhytoExp))
+      write(f,rec=1,Float32.(xprt))
       close(f)
       #to re-read file:
       #f =  FortranFile(filOut,"r",access="direct",recl=recl,convert="big-endian");
@@ -250,13 +250,12 @@ function loop_task4(indx)
 
    task=YAML.load(open("task.yml"))
 
-   dirIn=task["InputDir"][1]
+   dirIn=task["InputDir"]
    filIn=task["InputFile"][1]
    dirOut=task["OutputDir"]
-   filOut=task["OutputFile"]
    !isdir(dirOut) ? mkdir(dirOut) : nothing
 
-   siz=Tuple(task["OutputSize"])
+   siz=Tuple(task["InputSize"])
    prec=Float32
 
    tmp1=readdir(dirIn*filIn)
@@ -271,23 +270,36 @@ function loop_task4(indx)
 
    YearStart=task["Specs"]["YearStart"]
    YearEnd=task["Specs"]["YearEnd"]
+   AverageType=task["Specs"]["AverageType"]
 
-   dayList=collect(1:366)
+   nrec=missing
+   AverageType=="daily" ? nrec=366 : nothing
+   AverageType=="monthly" ? nrec=12 : nothing
+
+   dayList=collect(1:nrec)
    dayList=dayList[indx]
-   tmpList=Array{Array,1}(undef,366)
+   tmpList=Array{Array,1}(undef,nrec)
 
    for ff=dayList
 
       #identify all relevant records
       tmp=fill(false,length(filList))
       for ii=1:length(filList)
-         tt=DateTime(1992,1,1,12)+Dates.Day(ii-1)
-         dd=Day(Dates.Day(1)+tt-DateTime(year(tt),1,1,12))
-         year(tt)>=YearStart && year(tt)<=YearEnd && dd.value==ff ? tmp[ii]=true : nothing
+         if AverageType=="daily"
+            tt=DateTime(1992,1,1,12)+Dates.Day(ii-1)
+            dd=Day(Dates.Day(1)+tt-DateTime(year(tt),1,1,12))
+            year(tt)>=YearStart && year(tt)<=YearEnd && dd.value==ff ? tmp[ii]=true : nothing
+         end
+         if AverageType=="monthly"
+            tt=DateTime(1992,1,15)+Dates.Month(ii-1)
+            year(tt)>=YearStart && year(tt)<=YearEnd && Month(tt).value==ff ? tmp[ii]=true : nothing
+         end
       end
       recList=findall(tmp)
       tmpList[ff]=recList
       isempty(recList) ? error("no record found to average") : nothing
+
+      println(length(recList))
 
       #compute time average
       ave = fill(0.0,siz)
@@ -295,7 +307,7 @@ function loop_task4(indx)
       for ii=recList
          fil=dirIn*filIn*"/"*filList[ii]
          #println(fil)
-         tmp=Array{Float32,length(siz)}(undef,siz)
+         tmp=Array{prec,length(siz)}(undef,siz)
          fid = open(fil)
          read!(fid,tmp)
          tmp = hton.(tmp)
@@ -305,13 +317,13 @@ function loop_task4(indx)
 
       #output to file
       recl=prod(siz)*4
-      filOut=dirOut*task["OutputFile"]*"/"
+      filOut=dirOut*filIn*"Clim/"
       !isdir(filOut) ? mkdir(filOut) : nothing
       gg=recList[1]
-      filOut=filOut*replace(filList[gg],task["InputFile"][1] => task["OutputFile"])
+      filOut=filOut*replace(filList[gg],filIn => filIn*"Clim")
       #println(filOut)
       f =  FortranFile(filOut,"w",access="direct",recl=recl,convert="big-endian")
-      write(f,rec=1,Float32.(ave))
+      write(f,rec=1,prec.(ave))
       close(f)
       #to re-read file:
       #f =  FortranFile(filOut,"r",access="direct",recl=recl,convert="big-endian");
