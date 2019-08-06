@@ -22,6 +22,7 @@ Currently the reference implementation consists of
 - `examples.jl` includes simple examples without `TaskDriver`.
 - `fileloops.jl` includes task loops such as `CbiomesProcessing.loop_task1()`](@ref). A real-life example is provided in the [`TaskDriver`](@ref) documentation reported below.
 - `utilities.jl` provides low-level functions such as [`TaskDriver`](@ref), [`MatrixInterp()`](@ref), and [`MetaFileRead()`](@ref).
+- `src/CMAP2019/` contains a workflow that was used to process model output for ingestion in [CMAP](https://cmap.readthedocs.io/en/latest/)
 
 ## Index
 
