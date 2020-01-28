@@ -3,8 +3,9 @@ using CbiomesProcessing
 
 makedocs(
     sitename = "CbiomesProcessing",
-    format = :html,
-    modules = [CbiomesProcessing]
+    format = Documenter.HTML(),
+    modules = [CbiomesProcessing],
+    authors="gaelforget <gforget@mit.edu>",
 )
 
 #    pages = Any[
@@ -16,5 +17,5 @@ makedocs(
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
 deploydocs(
-    repo = "github.com/gaelforget/CBIOMES-Processing.jl.git",
+    repo = "github.com/gaelforget/CbiomesProcessing.jl.git",
 )
